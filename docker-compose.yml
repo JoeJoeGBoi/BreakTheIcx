@@ -1,0 +1,12 @@
+version: "3.9"
+
+services:
+  telegram-bot:
+    build: .
+    container_name: telegram-bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json
+    command: python bot.py
