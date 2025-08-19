@@ -20,7 +20,10 @@ Telegram group moderation bot inspired by GroupHelpBot/Rose.
 
 ## Setup
 1. Place Firebase service account JSON in project root.
-```firebase-service-account.json```
+
+   ```firebase-service-account.json```
+
 2. Fill out `.env` file.
 3. Run using Docker:
+
    ```docker-compose build docker-compose up -d```
