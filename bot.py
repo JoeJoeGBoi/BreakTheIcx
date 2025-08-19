@@ -211,4 +211,67 @@ async def track_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.args:
         username = context.args[0].lstrip("@")
-        all_users = USERS_REF.get()
+        all_users = USERS_REF.get() or {}
+        for uid, data in all_users.items():
+            if any(username in h for h in data.get("history", [])):
+                hist = "\n".join(data.get("history", []))
+                await update.message.reply_text(f"History of {username}:\n{hist}")
+                return
+        await update.message.reply_text("User not found.")
+    else:
+        user_id = update.effective_user.id
+        hist = user_ref(user_id).child("history").get() or []
+        await update.message.reply_text("Your name history:\n" + "\n".join(hist))
+
+# -----------------------
+# Message Handler (Flood, Filters, Auto Ban)
+# -----------------------
+async def check_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    chat_id = update.effective_chat.id
+    # Track name
+    await track_name(update, context)
+    # Auto-ban
+    if is_banned(chat_id, user.id):
+        try:
+            await update.effective_chat.ban_member(user.id)
+        except:
+            pass
+        return
+    # Flood control
+    now = time.time()
+    user_message_times[(chat_id, user.id)].append(now)
+    user_message_times[(chat_id, user.id)] = [t for t in user_message_times[(chat_id, user.id)] if now - t < 10]
+    flood_limit = group_ref(chat_id).child("flood_limit").get() or 5
+    if len(user_message_times[(chat_id, user.id)]) > flood_limit:
+        await update.effective_chat.restrict_member(user.id, permissions=ChatPermissions(can_send_messages=False))
+        await update.message.reply_text(f"🚨 {user.mention_html()} muted for flooding.", parse_mode="HTML")
+        return
+    # Filters
+    filters_dict = group_ref(chat_id).child("filters").get() or {}
+    for word, reply in filters_dict.items():
+        if word.lower() in update.message.text.lower():
+            await update.message.reply_text(reply)
+
+# -----------------------
+# Main
+# -----------------------
+if __name__ == "__main__":
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("about", about))
+    app.add_handler(CommandHandler("setwelcome", set_welcome))
+    app.add_handler(CommandHandler("setgoodbye", set_goodbye))
+    app.add_handler(CommandHandler("welcome", toggle_welcome))
+    app.add_handler(CommandHandler("goodbye", toggle_goodbye))
+    app.add_handler(CommandHandler("ban", ban))
+    app.add_handler(CommandHandler("unban", unban))
+    app.add_handler(CommandHandler("kick", kick))
+    app.add_handler(CommandHandler("mute", mute))
+    app.add_handler(CommandHandler("unmute", unmute))
+    app.add_handler(CommandHandler("history", history))
+    app.add_handler(MessageHandler(filters.ALL, check_messages))
+
+    app.run_polling()
