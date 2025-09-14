@@ -12,10 +12,14 @@ import time
 logging.basicConfig(level=logging.INFO)
 
 # Firebase init
-cred = credentials.Certificate(os.getenv("FIREBASE_CRED"))
-firebase_admin.initialize_app(cred, {
-    "databaseURL": os.getenv("FIREBASE_DB_URL")
-})
+firebase_cred_path = os.getenv("FIREBASE_CRED")
+firebase_db_url = os.getenv("FIREBASE_DB_URL")
+
+if not firebase_cred_path or not firebase_db_url:
+    raise RuntimeError("FIREBASE_CRED and FIREBASE_DB_URL must be set")
+
+cred = credentials.Certificate(firebase_cred_path)
+firebase_admin.initialize_app(cred, {"databaseURL": firebase_db_url})
 
 # References
 ADMINS_REF = db.reference("admins")
@@ -23,6 +27,8 @@ GROUPS_REF = db.reference("groups")
 USERS_REF = db.reference("users")
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN environment variable is required")
 
 # In-memory flood tracking
 user_message_times = defaultdict(list)
@@ -114,17 +120,27 @@ async def toggle_welcome(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("🚫 Only admins can toggle welcome.")
         return
+    if not context.args:
+        await update.message.reply_text("Usage: /welcome on|off")
+        return
     status = context.args[0].lower() == "on"
     group_ref(update.effective_chat.id).update({"welcome_on": status})
-    await update.message.reply_text(f"✅ Welcome messages {'enabled' if status else 'disabled'}.")
+    await update.message.reply_text(
+        f"✅ Welcome messages {'enabled' if status else 'disabled'}."
+    )
 
 async def toggle_goodbye(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not is_admin(update.effective_user.id):
         await update.message.reply_text("🚫 Only admins can toggle goodbye.")
         return
+    if not context.args:
+        await update.message.reply_text("Usage: /goodbye on|off")
+        return
     status = context.args[0].lower() == "on"
     group_ref(update.effective_chat.id).update({"goodbye_on": status})
-    await update.message.reply_text(f"✅ Goodbye messages {'enabled' if status else 'disabled'}.")
+    await update.message.reply_text(
+        f"✅ Goodbye messages {'enabled' if status else 'disabled'}."
+    )
 
 # -----------------------
 # Moderation Commands
@@ -249,8 +265,9 @@ async def check_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     # Filters
     filters_dict = group_ref(chat_id).child("filters").get() or {}
+    text = update.message.text or ""
     for word, reply in filters_dict.items():
-        if word.lower() in update.message.text.lower():
+        if word.lower() in text.lower():
             await update.message.reply_text(reply)
 
 # -----------------------
