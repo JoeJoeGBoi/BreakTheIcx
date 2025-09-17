@@ -24,6 +24,11 @@ Telegram group moderation bot inspired by GroupHelpBot/Rose.
    ```firebase-service-account.json```
 
 2. Fill out `.env` file.
-3. Run using Docker:
+3. Build and run using Docker:
 
-   ```docker-compose build docker-compose up -d```
+   ```
+   docker-compose build
+   docker-compose up -d
+   ```
+
+   The bot container will use the values from your `.env` file. Check the logs with `docker-compose logs -f bot` to confirm it connected successfully.

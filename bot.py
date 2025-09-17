@@ -71,11 +71,10 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 /setwelcome <text> → Set welcome message
 /setgoodbye <text> → Set goodbye message
 /ban (reply) → Ban user
+/unban (reply) → Unban user
 /kick (reply) → Kick user
 /mute (reply) → Mute user
 /unmute (reply) → Unmute user
-/promote (reply) → Promote user
-/demote (reply) → Demote user
 
 🔹 Filters & Anti-Spam
 /addfilter <word> <reply> → Add filter
@@ -243,6 +242,12 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Message Handler (Flood, Filters, Auto Ban)
 # -----------------------
 async def check_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    message = update.message
+
+    if message is None:
+        # Nothing to do for updates without a message payload (e.g. joins, callbacks)
+        return
+
     user = update.effective_user
     chat_id = update.effective_chat.id
     # Track name
@@ -261,14 +266,14 @@ async def check_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
     flood_limit = group_ref(chat_id).child("flood_limit").get() or 5
     if len(user_message_times[(chat_id, user.id)]) > flood_limit:
         await update.effective_chat.restrict_member(user.id, permissions=ChatPermissions(can_send_messages=False))
-        await update.message.reply_text(f"🚨 {user.mention_html()} muted for flooding.", parse_mode="HTML")
+        await message.reply_text(f"🚨 {user.mention_html()} muted for flooding.", parse_mode="HTML")
         return
     # Filters
     filters_dict = group_ref(chat_id).child("filters").get() or {}
-    text = update.message.text or ""
+    text = message.text or message.caption or ""
     for word, reply in filters_dict.items():
         if word.lower() in text.lower():
-            await update.message.reply_text(reply)
+            await message.reply_text(reply)
 
 # -----------------------
 # Main
