@@ -1,62 +1,80 @@
 # BreakTheICX Bot
 
-BreakTheICX is a Telegram moderation bot inspired by GroupHelpBot/Rose. It
-combines Firebase persistence with python-telegram-bot v20's async engine so
-you can run a full-featured group management bot in a headless Docker
-environment.
+BreakTheICX is a Telegram moderation bot that marries
+[python-telegram-bot](https://docs.python-telegram-bot.org/en/v20.7/) with
+Firebase Realtime Database storage. The project is tuned for headless Docker
+deployments so you can keep group management tooling online without babysitting
+it.
 
 ## Features
 
-- Local per-group bans stored in Firebase
+- Persisted per-group configuration and blacklists in Firebase
 - Customisable welcome/goodbye messages with templated variables (`{first}`,
   `{last}`, `{username}`)
-- Flood protection and keyword filters
-- Logging to a dedicated channel
-- Sangmata-style name history tracking
-- Admin-only moderation commands (ban, mute, promote, etc.)
-- Docker & docker-compose ready deployment
+- Flood protection, keyword filters, and basic moderation commands (ban, mute,
+  promote, demote)
+- Optional logging to a separate chat/channel
+- Sangmata-style username history tracking
+- Ready-to-run Dockerfile and docker-compose definition for headless hosting
 
-## Available Commands
+## Prerequisites
 
-| Category | Commands |
+- A Telegram bot token from [@BotFather](https://t.me/BotFather)
+- A Firebase project with a Realtime Database enabled
+- A Firebase service account JSON key with read/write access to the database
+
+### Environment variables
+
+| Variable | Description |
 | --- | --- |
-| General | `/start`, `/help`, `/about` |
-| Group Management | `/welcome on|off`, `/goodbye on|off`, `/setwelcome <text>`, `/setgoodbye <text>` |
-| Moderation | `/ban`, `/unban`, `/kick`, `/mute`, `/unmute`, `/promote`, `/demote` *(all via reply)* |
-| Filters & Anti-Spam | `/setflood <number>`, `/addfilter <word> <reply>`, `/delfilter <word>`, `/filters` |
-| Logging | `/setlog <chat_id>`, `/unsetlog`, `/logstatus` |
-| Sangmata | `/history`, `/history @username` |
+| `BOT_TOKEN` | Telegram bot token issued by BotFather. |
+| `FIREBASE_DB_URL` | Realtime Database URL (ends with `firebaseio.com`). |
+| `FIREBASE_CRED` | Path to the Firebase service account JSON file. |
+| `LOG_LEVEL` *(optional)* | Python logging level (`INFO`, `DEBUG`, etc.). |
 
-## Running with Docker
+`FIREBASE_CRED` should point to the location *inside the container* when running
+under Docker (the default compose file mounts it to
+`/app/firebase-service-account.json`).
 
-1. **Create the environment file**
+## Deploying with Docker Compose
+
+1. **Copy the sample environment file**
 
    ```bash
    cp .env.example .env
    ```
 
-   Update `.env` with your bot token and Firebase Realtime Database URL. The
-   default `FIREBASE_CRED` points to `/app/firebase-service-account.json`, which
-   is where the credentials file will be mounted inside the container.
+   Edit `.env` and provide the values described above.
 
-2. **Provide Firebase credentials**
+2. **Place the Firebase credentials**
 
-   Download the Firebase service account JSON from the Google Cloud console and
-   save it next to `docker-compose.yml` as `firebase-service-account.json` (the
-   file is ignored by git). Docker Compose mounts it read-only into the
-   container.
+   Download your Firebase service account JSON and save it alongside the
+   repository root as `firebase-service-account.json`. The filename is already
+   listed in `.gitignore` and will be mounted read-only into the container.
 
-3. **Build and start the container**
+3. **Allow yourself to administer the bot**
+
+   In the Firebase Realtime Database set `admins/<telegram_user_id>` to `true` so
+   your account can configure the bot. You can add additional admins the same
+   way later.
+
+4. **Build and launch the container**
 
    ```bash
-   docker-compose build
-   docker-compose up -d
+   docker compose up -d --build
    ```
 
-   The bot will connect to Telegram and Firebase automatically once the
-   container is running.
+5. **Tail the logs** *(optional)*
 
-## Running Locally (without Docker)
+   ```bash
+   docker compose logs -f telegram-bot
+   ```
+
+   The bot automatically connects to Telegram and Firebase once the container is
+   running. Any missing environment variables or credential issues are reported
+   through the logs.
+
+## Running locally (without Docker)
 
 ```bash
 python -m venv .venv
@@ -64,17 +82,17 @@ source .venv/bin/activate
 pip install -r requirements.txt
 export BOT_TOKEN="123456789:example-token"
 export FIREBASE_DB_URL="https://your-project-default-rtdb.firebaseio.com/"
-export FIREBASE_CRED="/path/to/firebase-service-account.json"
+export FIREBASE_CRED="/absolute/path/to/firebase-service-account.json"
 python bot.py
 ```
 
-## Firebase Structure
+## Firebase structure
 
-The bot stores configuration under the following top-level keys:
+The bot expects the following top-level keys in the Realtime Database:
 
-- `admins/<user_id>` – boolean flag for global admins allowed to configure the bot
-- `groups/<chat_id>` – per-group configuration (welcome text, filters, flood limits, log channel)
-- `users/<user_id>/history` – Sangmata-style name history
+- `admins/<user_id>` – `true` for users allowed to configure the bot
+- `groups/<chat_id>` – per-group configuration (welcome text, filters, flood
+  limits, log channel, blacklist)
+- `users/<user_id>/history` – Sangmata-style name history entries
 
-Make sure the Firebase Realtime Database rules allow the bot's service account
-to read/write these paths.
+Ensure your service account has permission to read and write these paths.
