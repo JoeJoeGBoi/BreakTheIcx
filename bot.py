@@ -1,8 +1,11 @@
+import base64
 import html
+import json
 import os
 import logging
 import time
 from collections import defaultdict
+from pathlib import Path
 from typing import Any, Dict, List
 
 import firebase_admin
@@ -19,13 +22,73 @@ from telegram.ext import (
 logging.basicConfig(level=logging.INFO)
 
 # Firebase init
-firebase_cred_path = os.getenv("FIREBASE_CRED")
+
+
+def load_firebase_credentials() -> credentials.Certificate:
+    firebase_cred_json = os.getenv("FIREBASE_CRED_JSON")
+    firebase_cred_base64 = os.getenv("FIREBASE_CRED_BASE64")
+    firebase_cred_path = os.getenv("FIREBASE_CRED")
+
+    if firebase_cred_json:
+        try:
+            return credentials.Certificate(json.loads(firebase_cred_json))
+        except json.JSONDecodeError as exc:
+            raise RuntimeError("FIREBASE_CRED_JSON must contain valid JSON.") from exc
+
+    if firebase_cred_base64:
+        try:
+            decoded = base64.b64decode(firebase_cred_base64)
+            return credentials.Certificate(json.loads(decoded.decode("utf-8")))
+        except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError(
+                "FIREBASE_CRED_BASE64 must contain base64 encoded Firebase credentials JSON."
+            ) from exc
+
+    if firebase_cred_path:
+        sanitized_path = firebase_cred_path.strip().strip('"').strip("'")
+        normalized_path = sanitized_path.replace("\\", os.sep)
+        project_root = Path(__file__).resolve().parent
+
+        candidates = [
+            Path(os.path.expanduser(normalized_path)),
+        ]
+
+        primary_candidate = candidates[0]
+        if not primary_candidate.is_absolute():
+            candidates.append(project_root / primary_candidate)
+        candidates.append(project_root / Path(normalized_path).name)
+        candidates.append(Path.cwd() / Path(normalized_path).name)
+
+        seen_paths = set()
+        for candidate in candidates:
+            if not candidate:
+                continue
+            resolved = candidate.expanduser()
+            key = str(resolved.resolve(strict=False))
+            if key in seen_paths:
+                continue
+            seen_paths.add(key)
+            if resolved.is_file():
+                return credentials.Certificate(str(resolved))
+
+        checked_locations = ", ".join(sorted(seen_paths)) or normalized_path
+        raise RuntimeError(
+            "Firebase credential file not found. Set FIREBASE_CRED to a valid file path or provide credentials "
+            "via FIREBASE_CRED_JSON or FIREBASE_CRED_BASE64. Checked: "
+            + checked_locations
+        )
+
+    raise RuntimeError(
+        "Set one of FIREBASE_CRED, FIREBASE_CRED_JSON, or FIREBASE_CRED_BASE64 with your Firebase credentials."
+    )
+
+
 firebase_db_url = os.getenv("FIREBASE_DB_URL")
 
-if not firebase_cred_path or not firebase_db_url:
-    raise RuntimeError("FIREBASE_CRED and FIREBASE_DB_URL must be set")
+if not firebase_db_url:
+    raise RuntimeError("FIREBASE_DB_URL must be set")
 
-cred = credentials.Certificate(firebase_cred_path)
+cred = load_firebase_credentials()
 firebase_admin.initialize_app(cred, {"databaseURL": firebase_db_url})
 
 # References
