@@ -7,6 +7,4 @@ services:
     restart: always
     env_file:
       - .env
-    volumes:
-      - ./firebase-service-account.json:/app/firebase-service-account.json
     command: python bot.py
