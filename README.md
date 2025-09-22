@@ -21,7 +21,7 @@ Telegram group moderation bot inspired by GroupHelpBot/Rose.
 ## Setup
 1. Provide the Firebase service account credentials using one of the supported options:
 
-   - Place the JSON file (for example `firebase-service-account.json`) in the project root and set `FIREBASE_CRED` to the file
+   - Place the JSON file (for example `serviceAccountkey.json`) in the project root and set `FIREBASE_CRED` to the file
      name or relative path.
    - Set `FIREBASE_CRED_JSON` to the raw JSON string.
    - Set `FIREBASE_CRED_BASE64` to the base64 encoded JSON content (useful when the JSON contains newlines that are hard to
