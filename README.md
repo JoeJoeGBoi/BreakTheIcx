@@ -32,7 +32,8 @@ Telegram group moderation bot inspired by GroupHelpBot/Rose.
 
    ```
    docker-compose build
-   docker-compose up -d
+   docker-compose up -d   (Headless)
+
    ```
 
    The bot container will use the values from your `.env` file. Check the logs with `docker-compose logs -f bot` to confirm it connected successfully.
